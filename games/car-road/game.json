@@ -1,0 +1,8 @@
+{
+  "id": "car-road",
+  "title": "Дорога для машинки",
+  "description": "Вид сбоку: газ, трамплин впереди, прыжок.",
+  "href": "games/car-road/",
+  "icon": "🚗",
+  "ready": true
+}

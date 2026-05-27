@@ -1,0 +1,339 @@
+:root {
+    --bg: #87ceeb;
+    --road: #4a4a4a;
+    --accent: #fbbf24;
+    --ink: #fff8e8;
+    --panel: rgba(0, 0, 0, 0.45);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+}
+
+.is-hidden {
+    display: none !important;
+}
+
+#game-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ─── Car selection ───────────────────────────────────── */
+.car-select {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    background:
+        radial-gradient(1200px 600px at 50% 20%, rgba(255, 184, 108, 0.35) 0%, rgba(0,0,0,0) 60%),
+        linear-gradient(180deg, rgba(12, 16, 30, 0.35) 0%, rgba(8, 10, 18, 0.62) 100%),
+        url("../assets/textures/backgound.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    overflow-y: auto;
+}
+
+.car-select.is-hidden {
+    display: none !important;
+}
+
+.hub-back--select {
+    align-self: flex-start;
+    position: relative;
+    top: auto;
+    left: auto;
+    margin-bottom: 12px;
+}
+
+.car-select__header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.car-select__header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(1.2rem, 4vw, 1.6rem);
+    color: #1a1208;
+    margin-bottom: 6px;
+}
+
+.car-select__header p {
+    font-size: 0.75rem;
+    color: rgba(26, 18, 8, 0.65);
+}
+
+.car-select__header code {
+    font-size: 0.7rem;
+    background: rgba(0, 0, 0, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.car-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 14px;
+    width: 100%;
+    max-width: 520px;
+    flex: 1;
+    align-content: start;
+}
+
+.car-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.35);
+    border: 3px solid transparent;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s, background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.car-card:hover {
+    background: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
+}
+
+.car-card.is-selected {
+    border-color: #f59e0b;
+    background: rgba(255, 248, 232, 0.75);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.car-card__preview {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    display: block;
+}
+
+.car-card__preview--gl {
+    background: #5a8ab5;
+}
+
+.car-card__preview--gl[hidden] {
+    display: none !important;
+}
+
+.car-select__loading,
+.car-select__hint {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: 0.8rem;
+    color: rgba(26, 18, 8, 0.75);
+    padding: 8px 0;
+}
+
+.car-card__name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #1a1208;
+    text-transform: capitalize;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.car-card__err {
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+.car-select__error {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: #7f1d1d;
+    font-size: 0.85rem;
+}
+
+.btn-start {
+    margin-top: 20px;
+    min-width: 200px;
+    min-height: 56px;
+    font-size: 1.1rem;
+    background: linear-gradient(180deg, #fde047 0%, var(--accent) 100%);
+    box-shadow: 0 4px 0 #b45309, 0 10px 28px rgba(0, 0, 0, 0.2);
+}
+
+.btn-start:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.ui-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.ui-layer a,
+.ui-layer button {
+    pointer-events: auto;
+}
+
+.hub-back {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    padding: 8px 14px;
+    font-size: 0.75rem;
+    color: var(--ink);
+    text-decoration: none;
+    background: var(--panel);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+}
+
+.controls {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 12px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
+             max(16px, env(safe-area-inset-left));
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+    justify-content: center;
+}
+
+.btn {
+    font-family: 'Orbitron', 'JetBrains Mono', sans-serif;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    color: #1a1208;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    transition: transform 0.1s ease, filter 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active,
+.btn.is-active {
+    transform: scale(0.96);
+    filter: brightness(1.1);
+}
+
+.btn-icon {
+    flex: 0 0 auto;
+    width: 64px;
+    height: 64px;
+    min-width: 64px;
+    min-height: 64px;
+    padding: 0;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn__icon {
+    width: 32px;
+    height: 32px;
+    display: block;
+    pointer-events: none;
+    object-fit: contain;
+}
+
+.btn-gas {
+    background: linear-gradient(180deg, #fde047 0%, var(--accent) 100%);
+    box-shadow: 0 4px 0 #b45309, 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.btn-ramp {
+    background: linear-gradient(180deg, #fcd34d 0%, #f59e0b 100%);
+    box-shadow: 0 4px 0 #92400e, 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.btn-car {
+    background: linear-gradient(180deg, #e0e7ff 0%, #93c5fd 100%);
+    box-shadow: 0 4px 0 #1d4ed8, 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.hint-bar {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    padding: 8px 12px;
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.7);
+    background: var(--panel);
+    border-radius: 8px;
+    max-width: 140px;
+    line-height: 1.35;
+    text-align: right;
+}
+
+/* ─── Game loading overlay ────────────────────────────── */
+.game-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background:
+        radial-gradient(900px 500px at 50% 40%, rgba(255, 184, 108, 0.25) 0%, rgba(0, 0, 0, 0) 55%),
+        linear-gradient(180deg, rgba(20, 24, 40, 0.88) 0%, rgba(8, 10, 18, 0.94) 100%);
+    pointer-events: all;
+}
+
+.game-loading__spinner {
+    width: 52px;
+    height: 52px;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: game-loading-spin 0.85s linear infinite;
+}
+
+.game-loading__text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    text-transform: uppercase;
+}
+
+@keyframes game-loading-spin {
+    to { transform: rotate(360deg); }
+}

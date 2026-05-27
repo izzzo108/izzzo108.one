@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#87ceeb">
+    <title>Дорога для машинки — IzzzO 108</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/game.css">
+    <script src="../../shared/js/three-boot.js" data-vendor="../../vendor/"></script>
+    <script src="../../shared/js/gltf-helpers.js"></script>
+</head>
+<body>
+    <section id="car-select" class="car-select" aria-label="Выбор машины">
+        <a class="hub-back hub-back--select" href="../../">← Игры</a>
+        <header class="car-select__header">
+            <h1>Выбери машину</h1>
+            <p>Нажми на машину — сразу поедешь</p>
+        </header>
+        <div class="car-grid" id="carGrid">
+            <p class="car-select__loading">Загрузка машинок…</p>
+        </div>
+    </section>
+
+    <div id="game-loading" class="game-loading is-hidden" role="status" aria-live="polite" aria-busy="true">
+        <div class="game-loading__spinner" aria-hidden="true"></div>
+        <p class="game-loading__text">Загрузка…</p>
+    </div>
+
+    <canvas id="game-canvas" class="is-hidden" aria-label="Игра: дорога для машинки"></canvas>
+
+    <div class="ui-layer is-hidden" id="game-ui">
+        <a class="hub-back" href="../../">← Игры</a>
+        <p class="hint-bar">Газ — быстрее. Трамплин — впереди на дороге.</p>
+        <div class="controls">
+            <button type="button" class="btn btn-icon btn-gas" id="btnGas" aria-label="Газ">
+                <img class="btn__icon" src="assets/icons/AArrowUpFilled.svg" alt="" width="32" height="32">
+            </button>
+            <button type="button" class="btn btn-icon btn-ramp" id="btnRamp" aria-label="Трамплин">
+                <img class="btn__icon" src="assets/icons/RampUpArrow.svg" alt="" width="32" height="32">
+            </button>
+            <button type="button" class="btn btn-icon btn-car" id="btnNextCar" aria-label="Сменить машину">
+                <img class="btn__icon" src="assets/icons/OncomingAutomobile.svg" alt="" width="32" height="32">
+            </button>
+        </div>
+    </div>
+
+    <script src="js/ramp-collision.js"></script>
+    <script src="js/car-select.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
