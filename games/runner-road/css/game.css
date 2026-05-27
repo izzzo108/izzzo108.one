@@ -70,6 +70,9 @@ body { font-family: 'JetBrains Mono', monospace; background: #0b1220; }
 .runner-select__loading, .runner-select__error { text-align: center; color: var(--ink); opacity: 0.85; }
 
 .ui-layer { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+.ui-layer a,
+.ui-layer button { pointer-events: auto; }
+
 .hint-bar {
     position: fixed;
     right: max(12px, env(safe-area-inset-right));
@@ -79,21 +82,74 @@ body { font-family: 'JetBrains Mono', monospace; background: #0b1220; }
     border-radius: 8px;
     padding: 8px 12px;
     font-size: 0.72rem;
+    max-width: 160px;
+    line-height: 1.35;
+    text-align: right;
 }
+
 .controls {
     position: fixed;
-    left: 50%;
-    bottom: max(16px, env(safe-area-inset-bottom));
-    transform: translateX(-50%);
-    pointer-events: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 12px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
+             max(16px, env(safe-area-inset-left));
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+    justify-content: center;
 }
-.btn-runner {
-    border: 0;
-    border-radius: 12px;
-    padding: 12px 18px;
-    font: 700 0.82rem 'JetBrains Mono', monospace;
-    background: linear-gradient(180deg, #fcd34d 0%, #f59e0b 100%);
+
+.btn {
+    font-family: 'Orbitron', 'JetBrains Mono', sans-serif;
+    border: none;
+    border-radius: 14px;
     cursor: pointer;
+    color: #1a1208;
+    font-weight: 700;
+    transition: transform 0.1s ease, filter 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active,
+.btn.is-active {
+    transform: scale(0.96);
+    filter: brightness(1.1);
+}
+
+.btn-icon {
+    width: 64px;
+    height: 64px;
+    min-width: 64px;
+    min-height: 64px;
+    padding: 0;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn__icon {
+    width: 32px;
+    height: 32px;
+    display: block;
+    pointer-events: none;
+    object-fit: contain;
+}
+
+.btn-run {
+    background: linear-gradient(180deg, #fde047 0%, var(--accent) 100%);
+    box-shadow: 0 4px 0 #b45309, 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.btn-jump {
+    background: linear-gradient(180deg, #fcd34d 0%, #f59e0b 100%);
+    box-shadow: 0 4px 0 #92400e, 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.btn-switch {
+    background: linear-gradient(180deg, #e0e7ff 0%, #93c5fd 100%);
+    box-shadow: 0 4px 0 #1d4ed8, 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
 .game-loading {

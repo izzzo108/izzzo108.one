@@ -52,13 +52,8 @@ body {
 
 .games-grid {
     display: grid;
-    gap: 20px;
-}
-
-@media (min-width: 560px) {
-    .games-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+    gap: 16px;
+    grid-template-columns: 1fr;
 }
 
 .game-card {

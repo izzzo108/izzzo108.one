@@ -1,11 +1,12 @@
 /**
- * Runner Road — character runs on scrolling road.
+ * Runner Road — персонажи из assets/models/person/
  */
 (function () {
     const MODELS_ROOT = 'assets/models/';
     const PERSON_DIR = 'person/';
     const TEXTURES_BASE = 'assets/textures/';
     const RUNNER_X = -1.8;
+    const RUNNER_ROT_Y = Math.PI / 2;
     const GROUND_Y = -0.82;
     const ROAD_Y = GROUND_Y + 0.14;
     const ROAD_THICKNESS = 0.14;
@@ -14,12 +15,23 @@
     const ROAD_DEPTH = 2.4;
     const GROUND_DEPTH = 44;
     const BASE_SPEED = 5.2;
+    const RUN_SPEED = 8.5;
+    const GRAVITY = -18;
+    const JUMP_VY = 5.8;
+    const STATE_SUFFIX_RX = /_(run|jump)$/i;
 
     let renderer, scene, camera;
     let runner = null;
+    let runnerMixer = null;
+    let runnerAnimations = [];
+    let activeModelFile = null;
     let selectedRunnerFile = null;
     let runnerFiles = [];
+    let allPersonFiles = [];
     let runnerIndex = 0;
+    let characterVariants = { idle: null, run: null, jump: null };
+    let characterState = 'idle';
+    let modelCache = new Map();
     let roadTiles = [];
     let groundTiles = [];
     let roadMat = null;
@@ -27,14 +39,45 @@
     let roadUv = 0;
     let groundUv = 0;
     let lastT = 0;
+    let runHeld = false;
+    let isJumping = false;
+    let jumpY = 0;
+    let jumpVy = 0;
+    let jumpStateTimer = 0;
 
     const canvas = document.getElementById('game-canvas');
     const gameUi = document.getElementById('game-ui');
     const gameLoading = document.getElementById('game-loading');
+    const btnRun = document.getElementById('btnRun');
+    const btnJump = document.getElementById('btnJump');
     const btnNextRunner = document.getElementById('btnNextRunner');
 
     function assetUrl(path) {
         return new URL(path, document.baseURI).href;
+    }
+
+    function isBasePersonFile(file) {
+        if (!/\.glb$/i.test(file) || !file.startsWith(PERSON_DIR)) return false;
+        const name = (file.split('/').pop() || '').replace(/\.glb$/i, '');
+        return !STATE_SUFFIX_RX.test(name);
+    }
+
+    function personBaseName(file) {
+        return (file.split('/').pop() || '').replace(/\.glb$/i, '').replace(STATE_SUFFIX_RX, '');
+    }
+
+    function findPersonFile(name) {
+        const target = name.toLowerCase();
+        return allPersonFiles.find((f) => (f.split('/').pop() || '').toLowerCase() === target) || null;
+    }
+
+    function buildCharacterVariants(baseFile) {
+        const base = personBaseName(baseFile);
+        return {
+            idle: findPersonFile(base + '.glb') || baseFile,
+            run: findPersonFile(base + '_run.glb'),
+            jump: findPersonFile(base + '_jump.glb')
+        };
     }
 
     function createMat(color, rough = 0.9) {
@@ -116,64 +159,150 @@
         }
     }
 
+    async function getModelData(file) {
+        if (modelCache.has(file)) return modelCache.get(file);
+        const gltf = await window.GltfHelpers.loadGlb(assetUrl(MODELS_ROOT + file));
+        const data = { scene: gltf.scene, animations: gltf.animations || [] };
+        modelCache.set(file, data);
+        return data;
+    }
+
+    function disposeRunner() {
+        if (!runner) return;
+        scene.remove(runner);
+        runner.traverse((ch) => {
+            if (ch.geometry) ch.geometry.dispose();
+            if (ch.material) {
+                const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
+                mats.forEach((m) => m.dispose());
+            }
+        });
+        runner = null;
+        if (runnerMixer) {
+            runnerMixer.stopAllAction();
+            runnerMixer = null;
+        }
+    }
+
+    function playRunnerAnimations() {
+        if (!runner || !runnerAnimations.length) return;
+        const THREE = window.THREE;
+        runnerMixer = new THREE.AnimationMixer(runner);
+        runnerAnimations.forEach((clip) => {
+            const action = runnerMixer.clipAction(clip);
+            action.reset().play();
+        });
+    }
+
+    async function loadRunnerModel(file) {
+        if (!file) return;
+        const H = window.GltfHelpers;
+        const data = await getModelData(file);
+        disposeRunner();
+        activeModelFile = file;
+        runner = data.scene.clone(true);
+        runnerAnimations = data.animations;
+        H.prepareModelAsAuthored(runner, { groundY: ROAD_SURFACE_Y + jumpY });
+        runner.position.x = RUNNER_X;
+        runner.position.z = 0;
+        runner.rotation.y = RUNNER_ROT_Y;
+        scene.add(runner);
+        playRunnerAnimations();
+        updateRunnerPose(performance.now());
+    }
+
+    async function applyCharacterState(state) {
+        characterState = state;
+        const nextFile = characterVariants[state] || characterVariants.idle;
+        if (!nextFile || nextFile === activeModelFile) return;
+        await loadRunnerModel(nextFile);
+    }
+
+    function setupCharacter(baseFile) {
+        characterVariants = buildCharacterVariants(baseFile);
+        characterState = 'idle';
+    }
+
     async function initRunnerList() {
         const files = await window.GltfHelpers.loadModelsManifest(assetUrl(MODELS_ROOT));
-        runnerFiles = files
-            .filter((f) => /\.glb$/i.test(f))
-            .filter((f) => f.startsWith(PERSON_DIR))
-            .filter((f) => /^(Character|Char|Runner|Person|People|Man|Woman)/i.test((f.split('/').pop() || f)));
-        if (!runnerFiles.length) {
-            runnerFiles = files
-                .filter((f) => /\.glb$/i.test(f))
-                .filter((f) => f.startsWith(PERSON_DIR));
-        }
+        allPersonFiles = files.filter((f) => /\.glb$/i.test(f) && f.startsWith(PERSON_DIR));
+        runnerFiles = allPersonFiles.filter(isBasePersonFile);
+        runnerFiles.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
         runnerIndex = Math.max(0, runnerFiles.indexOf(selectedRunnerFile));
     }
 
     async function loadRunner(file) {
-        if (!file) return;
-        const H = window.GltfHelpers;
-        if (runner) {
-            scene.remove(runner);
-            runner.traverse((ch) => {
-                if (ch.geometry) ch.geometry.dispose();
-                if (ch.material) {
-                    const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
-                    mats.forEach((m) => m.dispose());
-                }
-            });
-            runner = null;
-        }
-
-        const gltf = await H.loadGlb(assetUrl(MODELS_ROOT + file));
-        runner = gltf.scene;
-        H.prepareModelAsAuthored(runner, { groundY: ROAD_SURFACE_Y });
-        runner.position.x = RUNNER_X;
-        runner.position.z = 0;
-        runner.rotation.y = Math.PI;
-        scene.add(runner);
+        selectedRunnerFile = file;
+        setupCharacter(file);
+        jumpY = 0;
+        jumpVy = 0;
+        isJumping = false;
+        jumpStateTimer = 0;
+        await loadRunnerModel(characterVariants.idle || file);
     }
 
     async function nextRunner() {
         if (!runnerFiles.length) return;
         runnerIndex = (runnerIndex + 1) % runnerFiles.length;
-        selectedRunnerFile = runnerFiles[runnerIndex];
-        await loadRunner(selectedRunnerFile);
+        await loadRunner(runnerFiles[runnerIndex]);
     }
 
-    function animateRunner(t) {
+    function updateJump(dt) {
+        if (jumpStateTimer > 0) jumpStateTimer -= dt;
+        if (!isJumping && jumpY <= 0) {
+            jumpY = 0;
+            jumpVy = 0;
+            return;
+        }
+        jumpVy += GRAVITY * dt;
+        jumpY += jumpVy * dt;
+        if (jumpY <= 0) {
+            jumpY = 0;
+            jumpVy = 0;
+            isJumping = false;
+            if (characterState === 'jump') {
+                const next = runHeld ? 'run' : 'idle';
+                applyCharacterState(next).catch((e) => console.warn(e));
+            }
+        }
+    }
+
+    function updateRunnerPose(t) {
         if (!runner) return;
-        const run = t * 0.014;
         runner.position.x = RUNNER_X;
-        runner.position.y = ROAD_SURFACE_Y + Math.abs(Math.sin(run)) * 0.06;
-        runner.rotation.z = Math.sin(run * 1.2) * 0.06;
+        runner.position.y = ROAD_SURFACE_Y + jumpY;
+        runner.position.z = 0;
+        runner.rotation.y = RUNNER_ROT_Y;
+        if (!isJumping && jumpY < 0.01 && characterState !== 'jump') {
+            const bob = runHeld ? t * 0.02 : t * 0.012;
+            runner.position.y += Math.abs(Math.sin(bob)) * (runHeld ? 0.04 : 0.02);
+        }
+    }
+
+    function syncRunState() {
+        if (isJumping || jumpStateTimer > 0) return;
+        const want = runHeld ? 'run' : 'idle';
+        if (want !== characterState && characterState !== 'jump') {
+            applyCharacterState(want).catch((e) => console.warn(e));
+        }
+    }
+
+    function triggerJump() {
+        if (isJumping) return;
+        isJumping = true;
+        jumpVy = JUMP_VY;
+        jumpStateTimer = 0.4;
+        applyCharacterState('jump').catch((e) => console.warn(e));
     }
 
     function loop(t) {
         if (!lastT) lastT = t;
         const dt = Math.min(0.05, (t - lastT) / 1000);
         lastT = t;
-        const move = BASE_SPEED * dt;
+        if (runnerMixer) runnerMixer.update(dt);
+
+        const speed = runHeld ? RUN_SPEED : BASE_SPEED;
+        const move = speed * dt;
         scrollTiles(groundTiles, move);
         scrollTiles(roadTiles, move);
         if (groundMat?.map) {
@@ -184,10 +313,35 @@
             roadUv -= move / TILE_WIDTH * 1.12;
             roadMat.map.offset.y = roadUv % 1;
         }
-        animateRunner(t);
-        camera.lookAt(RUNNER_X, ROAD_SURFACE_Y + 0.7, 0);
+
+        syncRunState();
+        updateJump(dt);
+        updateRunnerPose(t);
+        camera.lookAt(RUNNER_X, ROAD_SURFACE_Y + jumpY + 0.7, 0);
         renderer.render(scene, camera);
         requestAnimationFrame(loop);
+    }
+
+    function bindControls() {
+        const setRun = (on) => {
+            runHeld = on;
+            btnRun?.classList.toggle('is-active', on);
+            syncRunState();
+        };
+        btnRun?.addEventListener('pointerdown', (e) => { e.preventDefault(); setRun(true); });
+        btnRun?.addEventListener('pointerup', () => setRun(false));
+        btnRun?.addEventListener('pointerleave', () => setRun(false));
+        btnRun?.addEventListener('pointercancel', () => setRun(false));
+
+        btnJump?.addEventListener('click', (e) => {
+            e.preventDefault();
+            triggerJump();
+        });
+
+        btnNextRunner?.addEventListener('click', (e) => {
+            e.preventDefault();
+            nextRunner();
+        });
     }
 
     async function init() {
@@ -214,11 +368,7 @@
         await initRunnerList();
         if (!selectedRunnerFile && runnerFiles.length) selectedRunnerFile = runnerFiles[0];
         await loadRunner(selectedRunnerFile);
-
-        btnNextRunner?.addEventListener('click', (e) => {
-            e.preventDefault();
-            nextRunner();
-        });
+        bindControls();
 
         if (canvas) canvas.classList.remove('is-hidden');
         if (gameUi) gameUi.classList.remove('is-hidden');

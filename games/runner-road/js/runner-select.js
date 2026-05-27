@@ -4,6 +4,8 @@
 (function () {
     const MODELS_ROOT = 'assets/models/';
     const PERSON_DIR = 'person/';
+    const PREVIEW_ROT_Y = Math.PI / 2;
+    const STATE_SUFFIX_RX = /_(run|jump)$/i;
 
     const screen = document.getElementById('runner-select');
     const grid = document.getElementById('runnerGrid');
@@ -18,16 +20,15 @@
         return new URL(path, document.baseURI).href;
     }
 
-    function listRunnerModels(files) {
-        return files
-            .filter((f) => /\.glb$/i.test(f))
-            .filter((f) => f.startsWith(PERSON_DIR))
-            .filter((f) => /^(Character|Char|Runner|Person|People|Man|Woman)/i.test((f.split('/').pop() || f)));
+    function isBasePersonFile(file) {
+        if (!/\.glb$/i.test(file) || !file.startsWith(PERSON_DIR)) return false;
+        const name = (file.split('/').pop() || '').replace(/\.glb$/i, '');
+        return !STATE_SUFFIX_RX.test(name);
     }
 
     function displayName(file) {
         const base = (file.split('/').pop() || file).replace(/\.glb$/i, '');
-        return base.replace(/^(Character|Char|Runner|Person|People)_?/i, '').replace(/_/g, ' ') || base;
+        return base.replace(/_/g, ' ') || base;
     }
 
     async function loadFiles() {
@@ -35,11 +36,9 @@
             const r = await fetch(assetUrl(MODELS_ROOT + 'models-manifest.json'), { cache: 'no-store' });
             if (!r.ok) return [];
             const data = await r.json();
-            const byPrefix = listRunnerModels(data.models || []);
-            if (byPrefix.length) return byPrefix;
             return (data.models || [])
-                .filter((f) => /\.glb$/i.test(f))
-                .filter((f) => f.startsWith(PERSON_DIR));
+                .filter(isBasePersonFile)
+                .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
         } catch (e) {
             console.warn('runner models manifest failed', e);
             return [];
@@ -48,6 +47,7 @@
 
     function disposePreview(p) {
         if (p.rafId) cancelAnimationFrame(p.rafId);
+        p.mixer?.stopAllAction();
         p.renderer?.dispose();
         p.model?.traverse((m) => {
             if (m.geometry) m.geometry.dispose();
@@ -66,6 +66,7 @@
         const gltf = await H.loadGlb(assetUrl(MODELS_ROOT + file));
         const model = gltf.scene.clone();
         H.prepareModelAsAuthored?.(model, { groundY: 0 });
+        model.rotation.y = PREVIEW_ROT_Y;
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1f2937);
@@ -75,6 +76,9 @@
         scene.add(key);
         scene.add(model);
 
+        const mixer = gltf.animations?.length ? new THREE.AnimationMixer(model) : null;
+        if (mixer) gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
+
         const renderer = new THREE.WebGLRenderer({ canvas, alpha: false, antialias: true });
         renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
         renderer.setSize(canvas.clientWidth || 140, canvas.clientHeight || 140, false);
@@ -83,10 +87,10 @@
         camera.position.set(1.8, 1.2, 2.9);
         camera.lookAt(0, 0.8, 0);
 
-        const state = { renderer, scene, camera, model, rafId: 0 };
+        const state = { renderer, scene, camera, model, mixer, rafId: 0 };
         const tick = () => {
             if (gameStarted) return;
-            model.rotation.y += 0.015;
+            if (mixer) mixer.update(1 / 60);
             renderer.render(scene, camera);
             state.rafId = requestAnimationFrame(tick);
         };
@@ -110,7 +114,7 @@
         grid.innerHTML = '<p class="runner-select__loading">Загрузка персонажей…</p>';
         const files = await loadFiles();
         if (!files.length) {
-            grid.innerHTML = '<p class="runner-select__error">Положи .glb персонажей в assets/models/person/</p>';
+            grid.innerHTML = '<p class="runner-select__error">Положи .glb в assets/models/person/ (например Enot.glb)</p>';
             return;
         }
 
